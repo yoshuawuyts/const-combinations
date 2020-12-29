@@ -76,6 +76,8 @@ where
 {
     type Item = [I::Item; N];
 
+    // This impl was copied from:
+    // https://docs.rs/itertools/0.10.0/src/itertools/combinations.rs
     fn next(&mut self) -> Option<[<I as Iterator>::Item; N]> {
         if self.first {
             if self.k() > self.n() {
@@ -120,6 +122,8 @@ where
 
 use std::ops::Index;
 
+// This impl was copied from:
+// https://docs.rs/itertools/0.10.0/src/itertools/lazy_buffer.rs.html
 #[derive(Debug, Clone)]
 pub struct LazyBuffer<I: Iterator> {
     pub it: I,
