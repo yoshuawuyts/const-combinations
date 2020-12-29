@@ -3,16 +3,21 @@
 //! # Examples
 //!
 //! ```
+//! use const_combinations::IterExt;
+//!
 //! for [n1, n2, n3] in (1..5).combinations() {
 //!     println!("{}, {}, {}", n1, n2, n3);
 //! }
 //! ```
 
 #![feature(min_const_generics)]
+#![feature(maybe_uninit_uninit_array)]
+#![feature(maybe_uninit_slice)]
 
 use std::iter::Iterator;
+use std::mem::MaybeUninit;
 
-trait IterExt: Iterator + Clone + Sized
+pub trait IterExt: Iterator + Clone + Sized
 where
     <Self as Iterator>::Item: Clone,
 {
@@ -55,6 +60,13 @@ where
             first: true,
         }
     }
+
+    pub fn k(&self) -> usize {
+        self.current_n
+    }
+    pub fn n(&self) -> usize {
+        self.pool.len()
+    }
 }
 
 impl<I, const N: usize> Iterator for Combinations<I, N>
@@ -64,13 +76,45 @@ where
 {
     type Item = [I::Item; N];
 
-    // pub fn k(&self) -> usize { self.indices.len() }
-    //  pub fn n(&self) -> usize { self.pool.len() }
     fn next(&mut self) -> Option<[<I as Iterator>::Item; N]> {
-        // if self.first {
-        //     if self.current_n
-        // }
-        todo!();
+        if self.first {
+            if self.k() > self.n() {
+                return None;
+            }
+            self.first = false;
+        } else if self.indexes.is_empty() {
+            return None;
+        } else {
+            // Scan from the end, looking for an index to increment
+            let mut i: usize = self.current_n;
+
+            // Check if we need to consume more from the iterator
+            if self.indexes[i] == self.pool.len() - 1 {
+                self.pool.get_next(); // may change pool size
+            }
+
+            while self.indexes[i] == i + self.pool.len() - self.indexes.len() {
+                if i > 0 {
+                    i -= 1;
+                } else {
+                    // Reached the last combination
+                    return None;
+                }
+            }
+
+            // Increment index, and reset the ones to its right
+            self.indexes[i] += 1;
+            for j in i + 1..self.indexes.len() {
+                self.indexes[j] = self.indexes[j - 1] + 1;
+            }
+        }
+
+        // Create result vector based on the indexes
+        let mut out: [MaybeUninit<I::Item>; N] = MaybeUninit::uninit_array();
+        self.indexes
+            .iter()
+            .for_each(|i| out[*i] = MaybeUninit::new(self.pool[*i].clone()));
+        Some(unsafe { out.as_ptr().cast::<[I::Item; N]>().read() })
     }
 }
 
