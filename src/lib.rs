@@ -39,7 +39,6 @@ where
     I::Item: Clone,
 {
     pool: LazyBuffer<I>,
-    current_n: usize,
     indexes: [usize; N],
     first: bool,
 }
@@ -54,7 +53,6 @@ where
         pool.prefill(N);
 
         Self {
-            current_n: 0,
             indexes: [0; N],
             pool,
             first: true,
@@ -62,7 +60,7 @@ where
     }
 
     pub fn k(&self) -> usize {
-        self.current_n
+        N
     }
     pub fn n(&self) -> usize {
         self.pool.len()
@@ -88,7 +86,7 @@ where
             return None;
         } else {
             // Scan from the end, looking for an index to increment
-            let mut i: usize = self.current_n;
+            let mut i: usize = N - 1;
 
             // Check if we need to consume more from the iterator
             if self.indexes[i] == self.pool.len() - 1 {
