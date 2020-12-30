@@ -59,12 +59,8 @@ where
         }
 
         // Prefill the buffer.
-        let mut buffer = Vec::with_capacity(N);
-        let mut done = false;
-        if N > buffer.len() {
-            buffer.extend(iter.by_ref().take(N - buffer.len()));
-            done = buffer.len() < N;
-        }
+        let buffer: Vec<I::Item> = iter.by_ref().take(N).collect();
+        let done = buffer.len() < N;
 
         Self {
             indices,
