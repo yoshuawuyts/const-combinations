@@ -89,10 +89,12 @@ where
     fn next(&mut self) -> Option<[<I as Iterator>::Item; N]> {
         if self.first {
             // Validate N never exceeds the total no. of items in the iterator
-            if N > self.buffer.len() || N == 0 {
+            if N > self.buffer.len() {
                 return None;
             }
             self.first = false;
+        } else if N == 0 {
+            return None;
         } else {
             // Scan from the end, looking for an index to increment
             let mut i: usize = N - 1;
@@ -137,6 +139,13 @@ mod test {
     #[test]
     fn none_on_size_too_big() {
         let mut combinations = (1..2).combinations::<2>();
+        assert_eq!(combinations.next(), None);
+    }
+
+    #[test]
+    fn empty_arr_on_n_zero() {
+        let mut combinations = (1..5).combinations();
+        assert_eq!(combinations.next(), Some([]));
         assert_eq!(combinations.next(), None);
     }
 }
