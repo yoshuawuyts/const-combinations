@@ -13,10 +13,7 @@
 //! assert_eq!(combinations.next(), None);
 //! ```
 
-#![allow(stable_features)]
-#![feature(min_const_generics)]
 #![feature(maybe_uninit_uninit_array)]
-#![feature(maybe_uninit_slice)]
 
 use std::iter::Iterator;
 use std::mem::MaybeUninit;
