@@ -5,9 +5,12 @@
 //! ```
 //! use const_combinations::IterExt;
 //!
-//! for [n1, n2, n3] in (1..5).combinations() {
-//!     println!("{}, {}, {}", n1, n2, n3);
-//! }
+//! let mut combinations = (1..5).combinations();
+//! assert_eq!(combinations.next(), Some([1, 2, 3]));
+//! assert_eq!(combinations.next(), Some([1, 2, 4]));
+//! assert_eq!(combinations.next(), Some([1, 3, 4]));
+//! assert_eq!(combinations.next(), Some([2, 3, 4]));
+//! assert_eq!(combinations.next(), None);
 //! ```
 
 #![allow(stable_features)]
