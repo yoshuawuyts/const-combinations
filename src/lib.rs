@@ -39,7 +39,7 @@ where
     I::Item: Clone,
 {
     pool: LazyBuffer<I>,
-    indexes: [usize; N],
+    indices: [usize; N],
     first: bool,
 }
 
@@ -52,13 +52,13 @@ where
         let mut pool = LazyBuffer::new(iter);
         pool.prefill(N);
 
-        let mut indexes = [0; N];
+        let mut indices = [0; N];
         for i in 0..N {
-            indexes[i] = i;
+            indices[i] = i;
         }
 
         Self {
-            indexes,
+            indices,
             pool,
             first: true,
         }
@@ -94,11 +94,11 @@ where
             let mut i: usize = N - 1;
 
             // Check if we need to consume more from the iterator
-            if self.indexes[i] == self.pool.len() - 1 {
+            if self.indices[i] == self.pool.len() - 1 {
                 self.pool.get_next(); // may change pool size
             }
 
-            while self.indexes[i] == i + self.pool.len() - N {
+            while self.indices[i] == i + self.pool.len() - N {
                 if i > 0 {
                     i -= 1;
                 } else {
@@ -108,15 +108,15 @@ where
             }
 
             // Increment index, and reset the ones to its right
-            self.indexes[i] += 1;
+            self.indices[i] += 1;
             for j in i + 1..N {
-                self.indexes[j] = self.indexes[j - 1] + 1;
+                self.indices[j] = self.indices[j - 1] + 1;
             }
         }
 
         // Create result vector based on the indexes
         let mut out: [MaybeUninit<I::Item>; N] = MaybeUninit::uninit_array();
-        self.indexes
+        self.indices
             .iter()
             .enumerate()
             .for_each(|(oi, i)| out[oi] = MaybeUninit::new(self.pool[*i].clone()));
