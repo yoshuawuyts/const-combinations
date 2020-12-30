@@ -64,10 +64,8 @@ where
         // Prefill the buffer.
         let mut buffer = Vec::with_capacity(N);
         let mut done = false;
-        let buffer_len = buffer.len();
-        if !done && N > buffer_len {
-            let delta = N - buffer_len;
-            buffer.extend(iter.by_ref().take(delta));
+        if N > buffer.len() {
+            buffer.extend(iter.by_ref().take(N - buffer.len()));
             done = buffer.len() < N;
         }
 
@@ -90,23 +88,20 @@ where
 
     fn next(&mut self) -> Option<[<I as Iterator>::Item; N]> {
         if self.first {
-            if N > self.buffer.len() {
+            // Validate N never exceeds the total no. of items in the iterator
+            if N > self.buffer.len() || N == 0 {
                 return None;
             }
             self.first = false;
-        } else if N == 0 {
-            return None;
         } else {
             // Scan from the end, looking for an index to increment
             let mut i: usize = N - 1;
 
             // Check if we need to consume more from the iterator
-            if self.indices[i] == self.buffer.len() - 1 {
-                if !self.done {
-                    match self.iter.next() {
-                        Some(x) => self.buffer.push(x),
-                        None => self.done = true,
-                    }
+            if !self.done && self.indices[i] == self.buffer.len() - 1 {
+                match self.iter.next() {
+                    Some(x) => self.buffer.push(x),
+                    None => self.done = true,
                 }
             }
 
@@ -132,5 +127,16 @@ where
             out[oi] = MaybeUninit::new(self.buffer[*i].clone());
         });
         Some(unsafe { out.as_ptr().cast::<[I::Item; N]>().read() })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn none_on_size_too_big() {
+        let mut combinations = (1..2).combinations::<2>();
+        assert_eq!(combinations.next(), None);
     }
 }
