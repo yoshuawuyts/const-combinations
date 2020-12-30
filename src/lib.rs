@@ -10,6 +10,7 @@
 //! }
 //! ```
 
+#![allow(stable_features)]
 #![feature(min_const_generics)]
 #![feature(maybe_uninit_uninit_array)]
 #![feature(maybe_uninit_slice)]
@@ -39,8 +40,7 @@ where
     I::Item: Clone,
 {
     pool: LazyBuffer<I>,
-    current_n: usize,
-    indexes: [usize; N],
+    indices: [usize; N],
     first: bool,
 }
 
@@ -53,16 +53,20 @@ where
         let mut pool = LazyBuffer::new(iter);
         pool.prefill(N);
 
+        let mut indices = [0; N];
+        for i in 0..N {
+            indices[i] = i;
+        }
+
         Self {
-            current_n: 0,
-            indexes: [0; N],
+            indices,
             pool,
             first: true,
         }
     }
 
     pub fn k(&self) -> usize {
-        self.current_n
+        N
     }
     pub fn n(&self) -> usize {
         self.pool.len()
@@ -84,18 +88,18 @@ where
                 return None;
             }
             self.first = false;
-        } else if self.indexes.is_empty() {
+        } else if N == 0 {
             return None;
         } else {
             // Scan from the end, looking for an index to increment
-            let mut i: usize = self.current_n;
+            let mut i: usize = N - 1;
 
             // Check if we need to consume more from the iterator
-            if self.indexes[i] == self.pool.len() - 1 {
+            if self.indices[i] == self.pool.len() - 1 {
                 self.pool.get_next(); // may change pool size
             }
 
-            while self.indexes[i] == i + self.pool.len() - self.indexes.len() {
+            while self.indices[i] == i + self.pool.len() - N {
                 if i > 0 {
                     i -= 1;
                 } else {
@@ -105,17 +109,18 @@ where
             }
 
             // Increment index, and reset the ones to its right
-            self.indexes[i] += 1;
-            for j in i + 1..self.indexes.len() {
-                self.indexes[j] = self.indexes[j - 1] + 1;
+            self.indices[i] += 1;
+            for j in i + 1..N {
+                self.indices[j] = self.indices[j - 1] + 1;
             }
         }
 
         // Create result vector based on the indexes
         let mut out: [MaybeUninit<I::Item>; N] = MaybeUninit::uninit_array();
-        self.indexes
+        self.indices
             .iter()
-            .for_each(|i| out[*i] = MaybeUninit::new(self.pool[*i].clone()));
+            .enumerate()
+            .for_each(|(oi, i)| out[oi] = MaybeUninit::new(self.pool[*i].clone()));
         Some(unsafe { out.as_ptr().cast::<[I::Item; N]>().read() })
     }
 }
