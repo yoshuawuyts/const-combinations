@@ -52,8 +52,13 @@ where
         let mut pool = LazyBuffer::new(iter);
         pool.prefill(N);
 
+        let mut indexes = [0; N];
+        for i in 0..N {
+            indexes[i] = i;
+        }
+
         Self {
-            indexes: [0; N],
+            indexes,
             pool,
             first: true,
         }
