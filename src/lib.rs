@@ -42,7 +42,9 @@ where
     I: Clone + Iterator,
     I::Item: Clone,
 {
-    pool: LazyBuffer<I>,
+    iter: I,
+    done: bool,
+    buffer: Vec<I::Item>,
     indices: [usize; N],
     first: bool,
 }
@@ -52,27 +54,28 @@ where
     I: Clone + Iterator,
     I::Item: Clone,
 {
-    fn new(iter: I) -> Self {
-        let mut pool = LazyBuffer::new(iter);
-        pool.prefill(N);
-
+    fn new(mut iter: I) -> Self {
+        // Prepare the indices.
         let mut indices = [0; N];
         for i in 0..N {
             indices[i] = i;
         }
 
+        // Prefill the buffer.
+        let mut buffer = Vec::with_capacity(N);
+        let mut done = false;
+        if N > buffer.len() {
+            buffer.extend(iter.by_ref().take(N - buffer.len()));
+            done = buffer.len() < N;
+        }
+
         Self {
             indices,
-            pool,
             first: true,
+            iter,
+            done,
+            buffer,
         }
-    }
-
-    pub fn k(&self) -> usize {
-        N
-    }
-    pub fn n(&self) -> usize {
-        self.pool.len()
     }
 }
 
@@ -83,26 +86,26 @@ where
 {
     type Item = [I::Item; N];
 
-    // This impl was copied from:
-    // https://docs.rs/itertools/0.10.0/src/itertools/combinations.rs
     fn next(&mut self) -> Option<[<I as Iterator>::Item; N]> {
         if self.first {
-            if self.k() > self.n() {
+            // Validate N never exceeds the total no. of items in the iterator
+            if N > self.buffer.len() || N == 0 {
                 return None;
             }
             self.first = false;
-        } else if N == 0 {
-            return None;
         } else {
             // Scan from the end, looking for an index to increment
             let mut i: usize = N - 1;
 
             // Check if we need to consume more from the iterator
-            if self.indices[i] == self.pool.len() - 1 {
-                self.pool.get_next(); // may change pool size
+            if !self.done && self.indices[i] == self.buffer.len() - 1 {
+                match self.iter.next() {
+                    Some(x) => self.buffer.push(x),
+                    None => self.done = true,
+                }
             }
 
-            while self.indices[i] == i + self.pool.len() - N {
+            while self.indices[i] == i + self.buffer.len() - N {
                 if i > 0 {
                     i -= 1;
                 } else {
@@ -120,79 +123,20 @@ where
 
         // Create result vector based on the indexes
         let mut out: [MaybeUninit<I::Item>; N] = MaybeUninit::uninit_array();
-        self.indices
-            .iter()
-            .enumerate()
-            .for_each(|(oi, i)| out[oi] = MaybeUninit::new(self.pool[*i].clone()));
+        self.indices.iter().enumerate().for_each(|(oi, i)| {
+            out[oi] = MaybeUninit::new(self.buffer[*i].clone());
+        });
         Some(unsafe { out.as_ptr().cast::<[I::Item; N]>().read() })
     }
 }
 
-use std::ops::Index;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-// This impl was copied from:
-// https://docs.rs/itertools/0.10.0/src/itertools/lazy_buffer.rs.html
-#[derive(Debug, Clone)]
-pub struct LazyBuffer<I: Iterator> {
-    pub it: I,
-    done: bool,
-    buffer: Vec<I::Item>,
-}
-
-impl<I> LazyBuffer<I>
-where
-    I: Iterator,
-{
-    pub fn new(it: I) -> LazyBuffer<I> {
-        LazyBuffer {
-            it,
-            done: false,
-            buffer: Vec::new(),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.buffer.len()
-    }
-
-    pub fn get_next(&mut self) -> bool {
-        if self.done {
-            return false;
-        }
-        let next_item = self.it.next();
-        match next_item {
-            Some(x) => {
-                self.buffer.push(x);
-                true
-            }
-            None => {
-                self.done = true;
-                false
-            }
-        }
-    }
-
-    pub fn prefill(&mut self, len: usize) {
-        let buffer_len = self.buffer.len();
-
-        if !self.done && len > buffer_len {
-            let delta = len - buffer_len;
-
-            self.buffer.extend(self.it.by_ref().take(delta));
-            self.done = self.buffer.len() < len;
-        }
-    }
-}
-
-impl<I, J> Index<J> for LazyBuffer<I>
-where
-    I: Iterator,
-    I::Item: Sized,
-    Vec<I::Item>: Index<J>,
-{
-    type Output = <Vec<I::Item> as Index<J>>::Output;
-
-    fn index(&self, _index: J) -> &Self::Output {
-        self.buffer.index(_index)
+    #[test]
+    fn none_on_size_too_big() {
+        let mut combinations = (1..2).combinations::<2>();
+        assert_eq!(combinations.next(), None);
     }
 }
