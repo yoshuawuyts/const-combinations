@@ -87,7 +87,7 @@ where
                 return None;
             }
             self.first = false;
-        } else if self.indexes.is_empty() {
+        } else if N == 0 {
             return None;
         } else {
             // Scan from the end, looking for an index to increment
@@ -98,7 +98,7 @@ where
                 self.pool.get_next(); // may change pool size
             }
 
-            while self.indexes[i] == i + self.pool.len() - self.indexes.len() {
+            while self.indexes[i] == i + self.pool.len() - N {
                 if i > 0 {
                     i -= 1;
                 } else {
@@ -109,7 +109,7 @@ where
 
             // Increment index, and reset the ones to its right
             self.indexes[i] += 1;
-            for j in i + 1..self.indexes.len() {
+            for j in i + 1..N {
                 self.indexes[j] = self.indexes[j - 1] + 1;
             }
         }
