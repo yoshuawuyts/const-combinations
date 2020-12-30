@@ -118,7 +118,8 @@ where
         let mut out: [MaybeUninit<I::Item>; N] = MaybeUninit::uninit_array();
         self.indexes
             .iter()
-            .for_each(|i| out[*i] = MaybeUninit::new(self.pool[*i].clone()));
+            .enumerate()
+            .for_each(|(oi, i)| out[oi] = MaybeUninit::new(self.pool[*i].clone()));
         Some(unsafe { out.as_ptr().cast::<[I::Item; N]>().read() })
     }
 }
