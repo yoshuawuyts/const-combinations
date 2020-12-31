@@ -25,7 +25,6 @@
 
 #![feature(maybe_uninit_uninit_array)]
 
-use std::iter::FlatMap;
 use std::iter::Iterator;
 use std::mem::MaybeUninit;
 
@@ -188,15 +187,14 @@ where
     }
 }
 
-type CombToFullPermFn<T, const K: usize> = fn([T; K]) -> FullPermutations<T, K>;
-
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
 pub struct Permutations<I, const K: usize>
 where
     I: Iterator,
     I::Item: Clone,
 {
-    inner: FlatMap<Combinations<I, K>, FullPermutations<I::Item, K>, CombToFullPermFn<I::Item, K>>,
+    iter: Combinations<I, K>,
+    perm_iter: Option<FullPermutations<I::Item, K>>,
 }
 
 impl<I, const K: usize> Iterator for Permutations<I, K>
@@ -207,7 +205,18 @@ where
     type Item = [I::Item; K];
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        if let Some(perm_iter) = &mut self.perm_iter {
+            match perm_iter.next() {
+                Some(a) => Some(a),
+                None => {
+                    self.perm_iter = self.iter.next().map(FullPermutations::new);
+                    // Each `FullPermutations` is guaranteed to return at least one item
+                    self.perm_iter.as_mut().and_then(|i| i.next())
+                }
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -217,9 +226,9 @@ where
     I::Item: Clone,
 {
     fn new(iter: I) -> Self {
-        Self {
-            inner: Combinations::new(iter).flat_map(FullPermutations::new),
-        }
+        let mut iter = Combinations::new(iter);
+        let perm_iter = iter.next().map(FullPermutations::new);
+        Self { iter, perm_iter }
     }
 }
 
