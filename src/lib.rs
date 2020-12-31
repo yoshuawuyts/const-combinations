@@ -18,7 +18,7 @@
 use std::iter::Iterator;
 use std::mem::MaybeUninit;
 
-pub trait IterExt: Iterator + Clone + Sized
+pub trait IterExt: Iterator + Sized
 where
     <Self as Iterator>::Item: Clone,
 {
@@ -29,14 +29,14 @@ where
 
 impl<I> IterExt for I
 where
-    I: Clone + Iterator,
+    I: Iterator,
     <I as Iterator>::Item: Clone,
 {
 }
 
 pub struct Combinations<I, const N: usize>
 where
-    I: Clone + Iterator,
+    I: Iterator,
     I::Item: Clone,
 {
     iter: I,
@@ -48,7 +48,7 @@ where
 
 impl<I, const N: usize> Combinations<I, N>
 where
-    I: Clone + Iterator,
+    I: Iterator,
     I::Item: Clone,
 {
     fn new(mut iter: I) -> Self {
@@ -74,7 +74,7 @@ where
 
 impl<I, const N: usize> Iterator for Combinations<I, N>
 where
-    I: Clone + Iterator,
+    I: Iterator,
     I::Item: Clone,
 {
     type Item = [I::Item; N];
