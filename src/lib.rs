@@ -137,6 +137,100 @@ where
         });
         Some(unsafe { out.as_ptr().cast::<[I::Item; N]>().read() })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let n = self.buffer.len();
+        if K == 0 {
+            (1, Some(1))
+        } else if n < K {
+            (0, Some(0))
+        } else {
+            let iter_hint = self.iter.size_hint();
+            let lo = n + iter_hint.0;
+            let hi = if self.done {
+                Some(n)
+            } else {
+                iter_hint.1.map(|hi| hi + n)
+            };
+            let lower: Option<usize> = combination_count(lo, K);
+            let upper = hi.and_then(|hi| {
+                if hi == lo {
+                    lower
+                } else {
+                    combination_count(hi, K)
+                }
+            });
+            (lower.unwrap_or(0), upper)
+        }
+    }
+}
+
+fn combination_count(n: usize, mut k: usize) -> Option<usize> {
+    if n < k {
+        Some(0)
+    } else {
+        k = k.min(n - k);
+        let mut res: usize = 1;
+        for i in 0..k {
+            res = res.checked_mul(n - i)?;
+            res = res.checked_div(i + 1)?;
+        }
+        Some(res)
+    }
+}
+
+#[test]
+fn test_combination_count() {
+    assert_eq!(combination_count(0, 0), Some(1));
+    assert_eq!(combination_count(0, 1), Some(0));
+
+    assert_eq!(combination_count(1, 0), Some(1));
+    assert_eq!(combination_count(1, 1), Some(1));
+    assert_eq!(combination_count(1, 2), Some(0));
+
+    assert_eq!(combination_count(2, 0), Some(1));
+    assert_eq!(combination_count(2, 1), Some(2));
+    assert_eq!(combination_count(2, 2), Some(1));
+    assert_eq!(combination_count(2, 3), Some(0));
+
+    assert_eq!(combination_count(3, 0), Some(1));
+    assert_eq!(combination_count(3, 1), Some(3));
+    assert_eq!(combination_count(3, 2), Some(3));
+    assert_eq!(combination_count(3, 3), Some(1));
+    assert_eq!(combination_count(3, 4), Some(0));
+}
+
+fn permutation_count(n: usize, k: usize) -> Option<usize> {
+    if n < k {
+        Some(0)
+    } else {
+        let mut res: usize = 1;
+        for i in n - k + 1..=n {
+            res = res.checked_mul(i)?;
+        }
+        Some(res)
+    }
+}
+
+#[test]
+fn test_permutation_count() {
+    assert_eq!(permutation_count(0, 0), Some(1));
+    assert_eq!(permutation_count(0, 1), Some(0));
+
+    assert_eq!(permutation_count(1, 0), Some(1));
+    assert_eq!(permutation_count(1, 1), Some(1));
+    assert_eq!(permutation_count(1, 2), Some(0));
+
+    assert_eq!(permutation_count(2, 0), Some(1));
+    assert_eq!(permutation_count(2, 1), Some(2));
+    assert_eq!(permutation_count(2, 2), Some(2));
+    assert_eq!(permutation_count(2, 3), Some(0));
+
+    assert_eq!(permutation_count(3, 0), Some(1));
+    assert_eq!(permutation_count(3, 1), Some(3));
+    assert_eq!(permutation_count(3, 2), Some(6));
+    assert_eq!(permutation_count(3, 3), Some(6));
+    assert_eq!(permutation_count(3, 4), Some(0));
 }
 
 struct FullPermutations<T, const N: usize> {
@@ -185,6 +279,26 @@ where
             None
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.i > 0 {
+            (0, Some(0))
+        } else {
+            let mut returned_count: Option<usize> = Some(if self.first { 0 } else { 1 });
+            let mut mult: Option<usize> = Some(1);
+            for (i, c) in self.c.iter().enumerate().skip(1) {
+                mult = mult.and_then(|mult| mult.checked_mul(i));
+                returned_count = returned_count.zip(mult).map(|(rc, mult)| rc + mult * c);
+            }
+            mult = mult.and_then(|mult| mult.checked_mul(N));
+            if let Some((count, rc)) = mult.zip(returned_count) {
+                let remaining = count - rc;
+                (remaining, Some(remaining))
+            } else {
+                (0, None)
+            }
+        }
+    }
 }
 
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
@@ -217,6 +331,22 @@ where
         } else {
             None
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let iter_hint = dbg!(self.iter.size_hint());
+        let full_perm_count = dbg!(permutation_count(K, K));
+        let lower = full_perm_count.map(|cnt| iter_hint.0 * cnt);
+        let upper = full_perm_count.and_then(|cnt| iter_hint.1.map(|hi| hi * cnt));
+        let perm_hint = dbg!(self
+            .perm_iter
+            .as_ref()
+            .map(|it| it.size_hint())
+            .unwrap_or((0, Some(0))));
+        (
+            lower.unwrap_or(0) + perm_hint.0,
+            upper.map(|upper| upper + perm_hint.1.unwrap()),
+        )
     }
 }
 
@@ -260,5 +390,30 @@ mod test {
         let mut permutations = (1..5).permutations();
         assert_eq!(permutations.next(), Some([]));
         assert_eq!(permutations.next(), None);
+    }
+
+    #[test]
+    fn combinations_size_hint() {
+        let combinations = (0..5u8).combinations::<2>();
+        assert_eq!(combinations.size_hint(), (10, Some(10)));
+    }
+
+    #[test]
+    fn full_permutations_size_hint() {
+        let mut perms = FullPermutations::new([0u8; 5]);
+        assert_eq!(perms.size_hint(), (120, Some(120)));
+        let mut expexted = 120;
+        while let Some(_) = perms.next() {
+            expexted -= 1;
+            assert_eq!(perms.size_hint(), (expexted, Some(expexted)));
+        }
+        assert_eq!(perms.size_hint(), (0, Some(0)));
+    }
+
+    #[test]
+    fn permutations_size_hint() {
+        let permutations = (0..5).permutations::<3>();
+        assert_eq!(permutations.size_hint(), (60, Some(60)));
+        for _ in permutations {}
     }
 }
