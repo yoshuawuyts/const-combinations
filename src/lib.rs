@@ -20,7 +20,7 @@ use std::mem::MaybeUninit;
 
 pub trait IterExt: Iterator + Sized
 where
-    <Self as Iterator>::Item: Clone,
+    Self::Item: Clone,
 {
     fn combinations<const N: usize>(self) -> Combinations<Self, N> {
         Combinations::new(self)
@@ -30,7 +30,7 @@ where
 impl<I> IterExt for I
 where
     I: Iterator,
-    <I as Iterator>::Item: Clone,
+    I::Item: Clone,
 {
 }
 
@@ -79,7 +79,7 @@ where
 {
     type Item = [I::Item; N];
 
-    fn next(&mut self) -> Option<[<I as Iterator>::Item; N]> {
+    fn next(&mut self) -> Option<[I::Item; N]> {
         if self.first {
             // Validate N never exceeds the total no. of items in the iterator
             if N > self.buffer.len() {
