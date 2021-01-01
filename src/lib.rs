@@ -244,7 +244,7 @@ mod test {
     }
 
     #[test]
-     fn combinations_none_on_size_too_big() {
+    fn combinations_none_on_size_too_big() {
         let mut combinations = (1..2).combinations::<2>();
         assert_eq!(combinations.next(), None);
     }
