@@ -3,19 +3,19 @@ use std::iter::Iterator;
 
 #[derive(Clone, Debug)]
 struct FullPermutations<T, const N: usize> {
-    a: [T; N],
-    c: [usize; N],
-    i: usize,
+    items: [T; N],
+    indices: [usize; N],
     first: bool,
+    done: bool,
 }
 
 impl<T, const N: usize> FullPermutations<T, N> {
-    fn new(a: [T; N]) -> Self {
+    fn new(items: [T; N]) -> Self {
         Self {
-            a,
-            c: [0; N],
-            i: 1,
+            items,
+            indices: [0; N],
             first: true,
+            done: false,
         }
     }
 }
@@ -31,22 +31,26 @@ where
         // https://en.wikipedia.org/wiki/Heap%27s_algorithm
         if self.first {
             self.first = false;
-            Some(self.a.clone())
+        } else if self.done {
+            return None;
         } else {
-            while self.i < N {
-                if self.c[self.i] < self.i {
-                    let swap_i = if self.i & 1 == 0 { 0 } else { self.c[self.i] };
-                    self.a.swap(swap_i, self.i);
-                    self.c[self.i] += 1;
-                    self.i = 1;
-                    return Some(self.a.clone());
-                } else {
-                    self.c[self.i] = 0;
-                    self.i += 1;
-                }
+            let mut i = 1;
+            while i < N && self.indices[i] >= i {
+                self.indices[i] = 0;
+                i += 1;
             }
-            None
+            if i >= N {
+                self.done = true;
+                return None;
+            }
+            if i & 1 == 0 {
+                self.items.swap(i, 0);
+            } else {
+                self.items.swap(i, self.indices[i]);
+            };
+            self.indices[i] += 1;
         }
+        Some(self.items.clone())
     }
 }
 
