@@ -40,7 +40,6 @@ where
     I::Item: Clone,
 {
     iter: I,
-    done: bool,
     buffer: Vec<I::Item>,
     indices: [usize; N],
     first: bool,
@@ -60,13 +59,11 @@ where
 
         // Prefill the buffer.
         let buffer: Vec<I::Item> = iter.by_ref().take(N).collect();
-        let done = buffer.len() < N;
 
         Self {
             indices,
             first: true,
             iter,
-            done,
             buffer,
         }
     }
@@ -89,30 +86,24 @@ where
         } else if N == 0 {
             return None;
         } else {
-            // Scan from the end, looking for an index to increment
-            let mut i: usize = N - 1;
-
             // Check if we need to consume more from the iterator
-            if !self.done && self.indices[i] == self.buffer.len() - 1 {
+            if self.indices[0] == self.buffer.len() - N {
+                // Exhausted all combinations in the current buffer
                 match self.iter.next() {
                     Some(x) => self.buffer.push(x),
-                    None => self.done = true,
+                    None => return None,
                 }
             }
 
-            while self.indices[i] == i + self.buffer.len() - N {
-                if i > 0 {
-                    i -= 1;
-                } else {
-                    // Reached the last combination
-                    return None;
-                }
+            let mut i = 0;
+            // Find the last consecutive index
+            while i < N - 1 && self.indices[i] + 1 == self.indices[i + 1] {
+                i += 1;
             }
-
-            // Increment index, and reset the ones to its right
             self.indices[i] += 1;
-            for j in i + 1..N {
-                self.indices[j] = self.indices[j - 1] + 1;
+            // Increment index, and reset the ones to its left
+            for j in 0..i {
+                self.indices[j] = j;
             }
         }
 
@@ -128,6 +119,22 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn combinations_order() {
+        let mut combinations = (1..6).combinations();
+        assert_eq!(combinations.next(), Some([1, 2, 3]));
+        assert_eq!(combinations.next(), Some([1, 2, 4]));
+        assert_eq!(combinations.next(), Some([1, 3, 4]));
+        assert_eq!(combinations.next(), Some([2, 3, 4]));
+        assert_eq!(combinations.next(), Some([1, 2, 5]));
+        assert_eq!(combinations.next(), Some([1, 3, 5]));
+        assert_eq!(combinations.next(), Some([2, 3, 5]));
+        assert_eq!(combinations.next(), Some([1, 4, 5]));
+        assert_eq!(combinations.next(), Some([2, 4, 5]));
+        assert_eq!(combinations.next(), Some([3, 4, 5]));
+        assert_eq!(combinations.next(), None);
+    }
 
     #[test]
     fn none_on_size_too_big() {
