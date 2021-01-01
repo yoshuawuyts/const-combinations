@@ -14,7 +14,7 @@ impl<T, const N: usize> FullPermutations<T, N> {
         Self {
             a,
             c: [0; N],
-            i: 0,
+            i: 1,
             first: true,
         }
     }
@@ -38,7 +38,7 @@ where
                     let swap_i = if self.i & 1 == 0 { 0 } else { self.c[self.i] };
                     self.a.swap(swap_i, self.i);
                     self.c[self.i] += 1;
-                    self.i = 0;
+                    self.i = 1;
                     return Some(self.a.clone());
                 } else {
                     self.c[self.i] = 0;
