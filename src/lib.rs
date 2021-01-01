@@ -197,17 +197,15 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(perm_iter) = &mut self.perm_iter {
-            match perm_iter.next() {
-                Some(a) => Some(a),
-                None => {
-                    self.perm_iter = self.iter.next().map(FullPermutations::new);
-                    // Each `FullPermutations` is guaranteed to return at least one item
-                    self.perm_iter.as_mut().and_then(|i| i.next())
-                }
+            if let Some(a) = perm_iter.next() {
+                return Some(a);
             }
-        } else {
-            None
         }
+        self.perm_iter = self.iter.next().map(FullPermutations::new);
+        // Each `FullPermutations` is guaranteed to return at least one item.
+        // `None` will be returned only if `perm_iter` is `None`,
+        // which means that the inner iterator returned `None`.
+        self.perm_iter.as_mut().and_then(|i| i.next())
     }
 }
 
