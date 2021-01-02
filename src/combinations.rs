@@ -36,7 +36,7 @@ where
         }
 
         Self {
-            buffer: Vec::with_capacity(K),
+            buffer: Vec::new(),
             indices,
             first: true,
             iter,
@@ -54,6 +54,7 @@ where
     fn next(&mut self) -> Option<[I::Item; K]> {
         if self.first {
             // Fill the buffer for the first combination
+            self.buffer.reserve(K - self.buffer.len());
             while self.buffer.len() < K {
                 match self.iter.next() {
                     Some(x) => self.buffer.push(x),
