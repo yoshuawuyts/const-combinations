@@ -99,9 +99,10 @@ where
     I::Item: Clone,
 {
     pub(crate) fn new(iter: I) -> Self {
-        let mut iter = Combinations::new(iter);
-        let perm_iter = iter.next().map(FullPermutations::new);
-        Self { iter, perm_iter }
+        Self {
+            iter: Combinations::new(iter),
+            perm_iter: None,
+        }
     }
 }
 
