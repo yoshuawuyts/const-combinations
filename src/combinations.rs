@@ -1,4 +1,4 @@
-use std::iter::Iterator;
+use std::iter::{FusedIterator, Iterator};
 use std::mem::MaybeUninit;
 
 /// An iterator that returns k-length combinations of values from `iter`.
@@ -93,6 +93,14 @@ where
         });
         Some(unsafe { out.as_ptr().cast::<[I::Item; K]>().read() })
     }
+}
+
+impl<I, const K: usize> FusedIterator for Combinations<I, K>
+where
+    // If the bounds change, make sure to change `FusedIterator for Permutations` as well.
+    I: FusedIterator,
+    I::Item: Clone,
+{
 }
 
 #[cfg(test)]
