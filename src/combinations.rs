@@ -62,6 +62,8 @@ where
             }
             self.first = false;
         } else if K == 0 {
+            // This check is separated, because in case of K == 0 we still
+            // need to return a single empty array before returning None.
             return None;
         } else {
             // Check if we need to consume more from the iterator
