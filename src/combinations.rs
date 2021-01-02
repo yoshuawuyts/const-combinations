@@ -26,7 +26,7 @@ where
     I: Iterator,
     I::Item: Clone,
 {
-    pub(crate) fn new(mut iter: I) -> Self {
+    pub(crate) fn new(iter: I) -> Self {
         // Prepare the indices.
         let mut indices = [0; K];
         // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
@@ -36,7 +36,7 @@ where
         }
 
         Self {
-            buffer: iter.by_ref().take(K).collect(),
+            buffer: Vec::with_capacity(K),
             indices,
             first: true,
             iter,
@@ -53,9 +53,12 @@ where
 
     fn next(&mut self) -> Option<[I::Item; K]> {
         if self.first {
-            // Validate K never exceeds the total no. of items in the iterator
-            if K > self.buffer.len() {
-                return None;
+            // Fill the buffer for the first combination
+            while self.buffer.len() < K {
+                match self.iter.next() {
+                    Some(x) => self.buffer.push(x),
+                    None => return None,
+                }
             }
             self.first = false;
         } else if K == 0 {
