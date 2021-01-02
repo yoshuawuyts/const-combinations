@@ -26,11 +26,11 @@ where
     I: Iterator,
     I::Item: Clone,
 {
-    // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
-    #[allow(clippy::clippy::needless_range_loop)]
     pub(crate) fn new(mut iter: I) -> Self {
         // Prepare the indices.
         let mut indices = [0; K];
+        // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
+        #[allow(clippy::clippy::needless_range_loop)]
         for i in 0..K {
             indices[i] = i;
         }
@@ -53,7 +53,7 @@ where
 
     fn next(&mut self) -> Option<[I::Item; K]> {
         if self.first {
-            // Validate N never exceeds the total no. of items in the iterator
+            // Validate K never exceeds the total no. of items in the iterator
             if K > self.buffer.len() {
                 return None;
             }
@@ -96,7 +96,7 @@ mod test {
     use crate::IterExt;
 
     #[test]
-    fn combinations_order() {
+    fn order() {
         let mut combinations = (1..6).combinations();
         assert_eq!(combinations.next(), Some([1, 2, 3]));
         assert_eq!(combinations.next(), Some([1, 2, 4]));
@@ -112,13 +112,13 @@ mod test {
     }
 
     #[test]
-    fn combinations_none_on_size_too_big() {
+    fn none_on_size_too_big() {
         let mut combinations = (1..2).combinations::<2>();
         assert_eq!(combinations.next(), None);
     }
 
     #[test]
-    fn combinations_empty_arr_on_n_zero() {
+    fn empty_arr_on_n_zero() {
         let mut combinations = (1..5).combinations();
         assert_eq!(combinations.next(), Some([]));
         assert_eq!(combinations.next(), None);

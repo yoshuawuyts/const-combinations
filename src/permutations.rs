@@ -106,13 +106,13 @@ mod test {
     use crate::IterExt;
 
     #[test]
-    fn permutations_none_on_size_too_big() {
+    fn none_on_size_too_big() {
         let mut permutations = (1..2).permutations::<2>();
         assert_eq!(permutations.next(), None);
     }
 
     #[test]
-    fn permutations_empty_arr_on_n_zero() {
+    fn empty_arr_on_n_zero() {
         let mut permutations = (1..5).permutations();
         assert_eq!(permutations.next(), Some([]));
         assert_eq!(permutations.next(), None);
