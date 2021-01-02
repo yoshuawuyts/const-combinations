@@ -127,4 +127,28 @@ mod test {
         assert_eq!(combinations.next(), None);
         assert_eq!(combinations.next(), None);
     }
+
+    #[test]
+    fn resume_after_none() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut combinations = receiver.try_iter().combinations();
+        assert_eq!(combinations.next(), None);
+
+        sender.send(1).unwrap();
+        assert_eq!(combinations.next(), None);
+
+        sender.send(2).unwrap();
+        assert_eq!(combinations.next(), None);
+
+        sender.send(3).unwrap();
+        assert_eq!(combinations.next(), Some([1, 2, 3]));
+        assert_eq!(combinations.next(), None);
+
+        sender.send(4).unwrap();
+        assert_eq!(combinations.next(), Some([1, 2, 4]));
+        assert_eq!(combinations.next(), Some([1, 3, 4]));
+        assert_eq!(combinations.next(), Some([2, 3, 4]));
+        assert_eq!(combinations.next(), None);
+        assert_eq!(combinations.next(), None);
+    }
 }
