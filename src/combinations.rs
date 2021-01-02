@@ -74,15 +74,13 @@ where
             }
 
             let mut i = 0;
-            // Find the last consecutive index
+            // Reset consecutive indices
             while i < K - 1 && self.indices[i] + 1 == self.indices[i + 1] {
+                self.indices[i] = i;
                 i += 1;
             }
+            // Increment the last consecutive index
             self.indices[i] += 1;
-            // Increment index, and reset the ones to its left
-            for j in 0..i {
-                self.indices[j] = j;
-            }
         }
 
         // Create result vector based on the indexes
