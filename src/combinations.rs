@@ -85,7 +85,7 @@ where
             self.indices[i] += 1;
         }
 
-        // Create result vector based on the indexes
+        // Create the result array based on the indices
         let mut out: [MaybeUninit<I::Item>; K] = MaybeUninit::uninit_array();
         self.indices.iter().enumerate().for_each(|(oi, i)| {
             out[oi] = MaybeUninit::new(self.buffer[*i].clone());
