@@ -110,11 +110,13 @@ mod test {
         assert_eq!(combinations.next(), Some([2, 4, 5]));
         assert_eq!(combinations.next(), Some([3, 4, 5]));
         assert_eq!(combinations.next(), None);
+        assert_eq!(combinations.next(), None);
     }
 
     #[test]
     fn none_on_size_too_big() {
         let mut combinations = (1..2).combinations::<2>();
+        assert_eq!(combinations.next(), None);
         assert_eq!(combinations.next(), None);
     }
 
@@ -122,6 +124,7 @@ mod test {
     fn empty_arr_on_n_zero() {
         let mut combinations = (1..5).combinations();
         assert_eq!(combinations.next(), Some([]));
+        assert_eq!(combinations.next(), None);
         assert_eq!(combinations.next(), None);
     }
 }
