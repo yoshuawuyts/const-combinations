@@ -141,12 +141,14 @@ mod test {
     fn none_on_size_too_big() {
         let mut permutations = (1..2).permutations::<2>();
         assert_eq!(permutations.next(), None);
+        assert_eq!(permutations.next(), None);
     }
 
     #[test]
     fn empty_arr_on_n_zero() {
         let mut permutations = (1..5).permutations();
         assert_eq!(permutations.next(), Some([]));
+        assert_eq!(permutations.next(), None);
         assert_eq!(permutations.next(), None);
     }
 }
