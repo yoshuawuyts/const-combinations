@@ -151,4 +151,27 @@ mod test {
         assert_eq!(permutations.next(), None);
         assert_eq!(permutations.next(), None);
     }
+
+    #[test]
+    fn resume_after_none() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut permutations = receiver.try_iter().permutations();
+        assert_eq!(permutations.next(), None);
+
+        sender.send(1).unwrap();
+        assert_eq!(permutations.next(), None);
+
+        sender.send(2).unwrap();
+        assert_eq!(permutations.next(), Some([1, 2]));
+        assert_eq!(permutations.next(), Some([2, 1]));
+        assert_eq!(permutations.next(), None);
+
+        sender.send(3).unwrap();
+        assert_eq!(permutations.next(), Some([1, 3]));
+        assert_eq!(permutations.next(), Some([3, 1]));
+        assert_eq!(permutations.next(), Some([2, 3]));
+        assert_eq!(permutations.next(), Some([3, 2]));
+        assert_eq!(permutations.next(), None);
+        assert_eq!(permutations.next(), None);
+    }
 }
