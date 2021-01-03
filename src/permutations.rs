@@ -1,5 +1,5 @@
 use super::Combinations;
-use std::iter::Iterator;
+use std::iter::{FusedIterator, Iterator};
 
 #[derive(Clone, Debug)]
 struct FullPermutations<T, const N: usize> {
@@ -99,10 +99,22 @@ where
     I::Item: Clone,
 {
     pub(crate) fn new(iter: I) -> Self {
-        let mut iter = Combinations::new(iter);
-        let perm_iter = iter.next().map(FullPermutations::new);
-        Self { iter, perm_iter }
+        Self {
+            iter: Combinations::new(iter),
+            perm_iter: None,
+        }
     }
+}
+
+impl<I, const K: usize> FusedIterator for Permutations<I, K>
+where
+    // This should be `I: Iterator, Combinations<I, K>: FusedIterator`,
+    // but it exposes the implementation and makes for lousy docs.
+    // I added a comment to `FusedIterator for Combinations`
+    // to change it here as well if it changes there.
+    I: FusedIterator,
+    I::Item: Clone,
+{
 }
 
 #[cfg(test)]
