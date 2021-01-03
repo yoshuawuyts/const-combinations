@@ -1,6 +1,9 @@
 //! const fn combinations iter adapter
 
+#![no_std]
 #![feature(maybe_uninit_uninit_array)]
+
+extern crate alloc;
 
 mod combinations;
 mod permutations;
