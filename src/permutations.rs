@@ -1,7 +1,7 @@
 use super::Combinations;
 use std::iter::{FusedIterator, Iterator};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct FullPermutations<T, const N: usize> {
     items: [T; N],
     indices: [usize; N],
@@ -61,7 +61,7 @@ where
 ///
 /// [`permutations`]: super::IterExt::permutations
 /// [`IterExt`]: super::IterExt
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
 pub struct Permutations<I, const K: usize>
 where

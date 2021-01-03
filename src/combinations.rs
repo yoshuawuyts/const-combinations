@@ -8,7 +8,7 @@ use std::mem::MaybeUninit;
 ///
 /// [`combinations`]: super::IterExt::combinations
 /// [`IterExt`]: super::IterExt
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
 pub struct Combinations<I, const K: usize>
 where
