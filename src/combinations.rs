@@ -13,7 +13,6 @@ use std::mem::MaybeUninit;
 pub struct Combinations<I, const K: usize>
 where
     I: Iterator,
-    I::Item: Clone,
 {
     iter: I,
     buffer: Vec<I::Item>,
@@ -24,7 +23,6 @@ where
 impl<I, const K: usize> Combinations<I, K>
 where
     I: Iterator,
-    I::Item: Clone,
 {
     pub(crate) fn new(iter: I) -> Self {
         // Prepare the indices.

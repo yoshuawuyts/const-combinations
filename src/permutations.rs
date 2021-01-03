@@ -66,7 +66,6 @@ where
 pub struct Permutations<I, const K: usize>
 where
     I: Iterator,
-    I::Item: Clone,
 {
     iter: Combinations<I, K>,
     perm_iter: Option<FullPermutations<I::Item, K>>,
@@ -96,7 +95,6 @@ where
 impl<I, const K: usize> Permutations<I, K>
 where
     I: Iterator,
-    I::Item: Clone,
 {
     pub(crate) fn new(iter: I) -> Self {
         Self {
