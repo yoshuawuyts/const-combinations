@@ -110,8 +110,8 @@ impl<I, const K: usize> FusedIterator for Permutations<I, K>
 where
     // This should be `I: Iterator, Combinations<I, K>: FusedIterator`,
     // but it exposes the implementation and makes for lousy docs.
-    // I added a comment to `FusedIterator for Combinations`
-    // to change it here as well if it changes there.
+    // There is a test which will stop compiling if the bounds for
+    // `FusedIterator for Combinations` impl change.
     I: FusedIterator,
     I::Item: Clone,
 {
@@ -119,9 +119,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::IterExt;
-
-    use super::FullPermutations;
 
     #[test]
     fn order() {
@@ -162,6 +161,15 @@ mod test {
         assert_eq!(permutations.next(), Some([]));
         assert_eq!(permutations.next(), None);
         assert_eq!(permutations.next(), None);
+    }
+
+    #[test]
+    fn fused_propagation() {
+        let fused = [1, 2, 3].iter().fuse();
+        let permutations = fused.permutations::<2>();
+
+        fn is_fused<T: FusedIterator>(_: T) {}
+        is_fused(permutations);
     }
 
     #[test]
