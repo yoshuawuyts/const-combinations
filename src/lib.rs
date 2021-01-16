@@ -7,13 +7,9 @@ extern crate alloc;
 
 mod combinations;
 mod permutations;
-mod slice_combinations;
-mod slice_permutations;
 
-pub use combinations::Combinations;
-pub use permutations::Permutations;
-pub use slice_combinations::SliceCombinations;
-pub use slice_permutations::SlicePermutations;
+pub use combinations::{Combinations, SliceCombinations};
+pub use permutations::{Permutations, SlicePermutations};
 
 /// An extension trait adding `combinations` and `permutations` to `Iterator`.
 pub trait IterExt: Iterator {
