@@ -1,6 +1,47 @@
 use alloc::vec::Vec;
 use core::iter::{FusedIterator, Iterator};
-use core::mem::MaybeUninit;
+
+#[derive(Clone)]
+pub struct LazyCombinationGenerator<const K: usize> {
+    indices: [usize; K],
+    done: bool,
+}
+
+impl<const K: usize> LazyCombinationGenerator<K> {
+    pub fn new() -> Self {
+        Self {
+            indices: crate::make_array(|i| i),
+            done: false,
+        }
+    }
+
+    pub fn max_index(&self) -> Option<usize> {
+        self.indices.last().copied()
+    }
+
+    pub fn is_done(&self, item_count: usize) -> bool {
+        self.done || self.max_index() >= Some(item_count)
+    }
+
+    pub fn indices(&self) -> &[usize; K] {
+        &self.indices
+    }
+
+    pub fn step(&mut self) {
+        if K == 0 {
+            self.done = true;
+        } else {
+            let mut i = 0;
+            // Reset consecutive indices
+            while i + 1 < K && self.indices[i] + 1 == self.indices[i + 1] {
+                self.indices[i] = i;
+                i += 1;
+            }
+            // Increment the last consecutive index
+            self.indices[i] += 1;
+        }
+    }
+}
 
 /// An iterator that returns k-length combinations of values from `iter`.
 ///
@@ -17,8 +58,7 @@ where
 {
     iter: I,
     buffer: Vec<I::Item>,
-    indices: [usize; K],
-    first: bool,
+    gen: LazyCombinationGenerator<K>,
 }
 
 impl<I, const K: usize> Combinations<I, K>
@@ -26,19 +66,10 @@ where
     I: Iterator,
 {
     pub(crate) fn new(iter: I) -> Self {
-        // Prepare the indices.
-        let mut indices = [0; K];
-        // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
-        #[allow(clippy::clippy::needless_range_loop)]
-        for i in 0..K {
-            indices[i] = i;
-        }
-
         Self {
             buffer: Vec::new(),
-            indices,
-            first: true,
             iter,
+            gen: LazyCombinationGenerator::new(),
         }
     }
 }
@@ -51,46 +82,26 @@ where
     type Item = [I::Item; K];
 
     fn next(&mut self) -> Option<[I::Item; K]> {
-        if self.first {
-            // Fill the buffer for the first combination
-            self.buffer.reserve(K - self.buffer.len());
-            while self.buffer.len() < K {
-                match self.iter.next() {
-                    Some(x) => self.buffer.push(x),
-                    None => return None,
-                }
-            }
-            self.first = false;
-        } else if K == 0 {
-            // This check is separated, because in case of K == 0 we still
-            // need to return a single empty array before returning None.
-            return None;
-        } else {
-            // Check if we need to consume more from the iterator
-            if self.indices[0] == self.buffer.len() - K {
-                // Exhausted all combinations in the current buffer
-                match self.iter.next() {
-                    Some(x) => self.buffer.push(x),
-                    None => return None,
-                }
-            }
-
-            let mut i = 0;
-            // Reset consecutive indices
-            while i < K - 1 && self.indices[i] + 1 == self.indices[i + 1] {
-                self.indices[i] = i;
-                i += 1;
-            }
-            // Increment the last consecutive index
-            self.indices[i] += 1;
+        // Check if we need to consume more from the iterator
+        let missing_count = self
+            .gen
+            .max_index()
+            .map(|m| (m + 1).saturating_sub(self.buffer.len()))
+            .unwrap_or_default();
+        if missing_count > 0 {
+            // Try to fill the buffer
+            self.buffer.extend(self.iter.by_ref().take(missing_count));
         }
 
-        // Create the result array based on the indices
-        let mut out: [MaybeUninit<I::Item>; K] = MaybeUninit::uninit_array();
-        self.indices.iter().enumerate().for_each(|(oi, i)| {
-            out[oi] = MaybeUninit::new(self.buffer[*i].clone());
-        });
-        Some(unsafe { out.as_ptr().cast::<[I::Item; K]>().read() })
+        if self.gen.is_done(self.buffer.len()) {
+            None
+        } else {
+            let indices = self.gen.indices();
+            let items = &self.buffer;
+            let res = crate::make_array(|i| items[indices[i]].clone());
+            self.gen.step();
+            Some(res)
+        }
     }
 }
 

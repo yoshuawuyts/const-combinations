@@ -9,6 +9,7 @@ mod combinations;
 mod permutations;
 
 pub use combinations::Combinations;
+use core::mem::MaybeUninit;
 pub use permutations::Permutations;
 
 /// An extension trait adding `combinations` and `permutations` to `Iterator`.
@@ -91,3 +92,18 @@ pub trait IterExt: Iterator {
 }
 
 impl<I> IterExt for I where I: Iterator {}
+
+pub(crate) fn make_array<T, F, const N: usize>(f: F) -> [T; N]
+where
+    F: Fn(usize) -> T,
+{
+    // Create the result array based on the indices
+    let mut out: [MaybeUninit<T>; N] = MaybeUninit::uninit_array();
+
+    // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
+    #[allow(clippy::clippy::needless_range_loop)]
+    for i in 0..N {
+        out[i] = MaybeUninit::new(f(i));
+    }
+    unsafe { out.as_ptr().cast::<[T; N]>().read() }
+}
