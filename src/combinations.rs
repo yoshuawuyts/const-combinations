@@ -8,12 +8,11 @@ use std::mem::MaybeUninit;
 ///
 /// [`combinations`]: super::IterExt::combinations
 /// [`IterExt`]: super::IterExt
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
 pub struct Combinations<I, const K: usize>
 where
     I: Iterator,
-    I::Item: Clone,
 {
     iter: I,
     buffer: Vec<I::Item>,
@@ -24,7 +23,6 @@ where
 impl<I, const K: usize> Combinations<I, K>
 where
     I: Iterator,
-    I::Item: Clone,
 {
     pub(crate) fn new(iter: I) -> Self {
         // Prepare the indices.

@@ -9,10 +9,7 @@ pub use combinations::Combinations;
 pub use permutations::Permutations;
 
 /// An extension trait adding `combinations` and `permutations` to `Iterator`.
-pub trait IterExt: Iterator + Sized
-where
-    Self::Item: Clone,
-{
+pub trait IterExt: Iterator {
     /// Return an iterator adaptor that iterates over the k-length combinations of
     /// the elements from an iterator.
     ///
@@ -43,7 +40,11 @@ where
     /// assert_eq!(combinations.next(), Some([2, 2]));
     /// assert_eq!(combinations.next(), None);
     /// ```
-    fn combinations<const K: usize>(self) -> Combinations<Self, K> {
+    fn combinations<const K: usize>(self) -> Combinations<Self, K>
+    where
+        Self: Sized,
+        Self::Item: Clone,
+    {
         Combinations::new(self)
     }
 
@@ -77,14 +78,13 @@ where
     /// assert_eq!(permutations.next(), Some([2, 2])); // Note: these are the same
     /// assert_eq!(permutations.next(), None);
     /// ```
-    fn permutations<const K: usize>(self) -> Permutations<Self, K> {
+    fn permutations<const K: usize>(self) -> Permutations<Self, K>
+    where
+        Self: Sized,
+        Self::Item: Clone,
+    {
         Permutations::new(self)
     }
 }
 
-impl<I> IterExt for I
-where
-    I: Iterator,
-    I::Item: Clone,
-{
-}
+impl<I> IterExt for I where I: Iterator {}
