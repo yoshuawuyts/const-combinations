@@ -1,5 +1,5 @@
 use super::Combinations;
-use std::iter::{FusedIterator, Iterator};
+use core::iter::{FusedIterator, Iterator};
 
 #[derive(Clone)]
 struct FullPermutations<T, const N: usize> {
@@ -119,6 +119,7 @@ where
 mod test {
     use super::*;
     use crate::IterExt;
+    use core::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
     fn order() {
@@ -172,19 +173,49 @@ mod test {
 
     #[test]
     fn resume_after_none() {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let mut permutations = receiver.try_iter().permutations();
+        struct ResumeIter<'l, 'a, T>
+        where
+            T: Copy,
+        {
+            items: &'a [T],
+            i: usize,
+            len: &'l AtomicUsize,
+        }
+
+        impl<T> Iterator for ResumeIter<'_, '_, T>
+        where
+            T: Copy,
+        {
+            type Item = T;
+            fn next(&mut self) -> Option<T> {
+                if self.i >= self.len.load(Ordering::SeqCst) {
+                    None
+                } else {
+                    self.i += 1;
+                    Some(self.items[self.i - 1])
+                }
+            }
+        }
+
+        let len = AtomicUsize::new(0);
+        let mut permutations = ResumeIter {
+            items: &[1, 2, 3],
+            len: &len,
+            i: 0,
+        }
+        .permutations();
+
         assert_eq!(permutations.next(), None);
 
-        sender.send(1).unwrap();
+        len.fetch_add(1, Ordering::SeqCst);
         assert_eq!(permutations.next(), None);
 
-        sender.send(2).unwrap();
+        len.fetch_add(1, Ordering::SeqCst);
         assert_eq!(permutations.next(), Some([1, 2]));
         assert_eq!(permutations.next(), Some([2, 1]));
         assert_eq!(permutations.next(), None);
 
-        sender.send(3).unwrap();
+        len.fetch_add(1, Ordering::SeqCst);
         assert_eq!(permutations.next(), Some([1, 3]));
         assert_eq!(permutations.next(), Some([3, 1]));
         assert_eq!(permutations.next(), Some([2, 3]));
