@@ -167,7 +167,7 @@ impl<T> SliceExt<T> for [T] {
     }
 }
 
-pub(crate) fn make_array<T, F, const N: usize>(f: F) -> [T; N]
+fn make_array<T, F, const N: usize>(f: F) -> [T; N]
 where
     F: Fn(usize) -> T,
 {
