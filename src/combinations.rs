@@ -97,7 +97,6 @@ where
 
 impl<I, const K: usize> FusedIterator for Combinations<I, K>
 where
-    // If the bounds change, make sure to change `FusedIterator for Permutations` as well.
     I: FusedIterator,
     I::Item: Clone,
 {
@@ -105,6 +104,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::IterExt;
 
     #[test]
@@ -137,6 +137,15 @@ mod test {
         assert_eq!(combinations.next(), Some([]));
         assert_eq!(combinations.next(), None);
         assert_eq!(combinations.next(), None);
+    }
+
+    #[test]
+    fn fused_propagation() {
+        let fused = [1, 2, 3].iter().fuse();
+        let combinations = fused.combinations::<2>();
+
+        fn is_fused<T: FusedIterator>(_: T) {}
+        is_fused(combinations);
     }
 
     #[test]
