@@ -105,6 +105,19 @@ where
     state: State<K>,
 }
 
+impl<I, const K: usize> Permutations<I, K>
+where
+    I: Iterator,
+{
+    pub(crate) fn new(iter: I) -> Self {
+        Self {
+            iter,
+            items: Vec::new(),
+            state: State::new(),
+        }
+    }
+}
+
 impl<I, const K: usize> Iterator for Permutations<I, K>
 where
     I: Iterator,
@@ -122,19 +135,6 @@ where
             }
         }
         self.state.get_and_step(&self.items, |t| t.clone())
-    }
-}
-
-impl<I, const K: usize> Permutations<I, K>
-where
-    I: Iterator,
-{
-    pub(crate) fn new(iter: I) -> Self {
-        Self {
-            iter,
-            items: Vec::new(),
-            state: State::new(),
-        }
     }
 }
 
