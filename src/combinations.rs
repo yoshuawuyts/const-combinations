@@ -57,7 +57,7 @@ where
     I: Iterator,
 {
     iter: I,
-    buffer: Vec<I::Item>,
+    items: Vec<I::Item>,
     gen: LazyCombinationGenerator<K>,
 }
 
@@ -67,7 +67,7 @@ where
 {
     pub(crate) fn new(iter: I) -> Self {
         Self {
-            buffer: Vec::new(),
+            items: Vec::new(),
             iter,
             gen: LazyCombinationGenerator::new(),
         }
@@ -86,19 +86,18 @@ where
         let missing_count = self
             .gen
             .max_index()
-            .map(|m| (m + 1).saturating_sub(self.buffer.len()))
+            .map(|m| (m + 1).saturating_sub(self.items.len()))
             .unwrap_or_default();
         if missing_count > 0 {
             // Try to fill the buffer
-            self.buffer.extend(self.iter.by_ref().take(missing_count));
+            self.items.extend(self.iter.by_ref().take(missing_count));
         }
 
-        if self.gen.is_done(self.buffer.len()) {
+        if self.gen.is_done(self.items.len()) {
             None
         } else {
             let indices = self.gen.indices();
-            let items = &self.buffer;
-            let res = crate::make_array(|i| items[indices[i]].clone());
+            let res = make_array(|i| self.items[indices[i]].clone());
             self.gen.step();
             Some(res)
         }
