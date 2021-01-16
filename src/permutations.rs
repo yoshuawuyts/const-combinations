@@ -1,15 +1,16 @@
-use crate::{combinations::LazyCombinationGenerator, make_array, Combinations};
+use crate::{combinations::LazyCombinationGenerator, make_array};
+use alloc::vec::Vec;
 use core::iter::{FusedIterator, Iterator};
 
 #[derive(Clone)]
-pub(crate) struct LazyPermutationGenerator<const N: usize> {
+pub struct LazyPermutationGenerator<const N: usize> {
     indices: [usize; N],
     counters: [usize; N],
     done: bool,
 }
 
 impl<const N: usize> LazyPermutationGenerator<N> {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             indices: make_array(|i| i),
             counters: [0; N],
@@ -46,6 +47,46 @@ impl<const N: usize> LazyPermutationGenerator<N> {
     }
 }
 
+#[derive(Clone)]
+struct State<const K: usize> {
+    comb_gen: LazyCombinationGenerator<K>,
+    perm_gen: LazyPermutationGenerator<K>,
+}
+
+impl<const K: usize> State<K> {
+    fn new() -> Self {
+        Self {
+            comb_gen: LazyCombinationGenerator::new(),
+            perm_gen: LazyPermutationGenerator::new(),
+        }
+    }
+
+    fn max_index(&self) -> Option<usize> {
+        self.comb_gen.max_index()
+    }
+
+    fn get_and_step<'a, T, O, F>(&mut self, items: &'a [T], f: F) -> Option<[O; K]>
+    where
+        F: Fn(&'a T) -> O,
+        O: 'a,
+    {
+        if self.comb_gen.is_done(items.len()) {
+            None
+        } else {
+            let comb_indices = self.comb_gen.indices();
+            let perm_indices = self.perm_gen.indices();
+            let res = make_array(|i| f(&items[comb_indices[perm_indices[i]]]));
+            self.perm_gen.step();
+            if self.perm_gen.is_done() {
+                // Reset the permutation generator and move to the next combination
+                self.perm_gen = LazyPermutationGenerator::new();
+                self.comb_gen.step();
+            }
+            Some(res)
+        }
+    }
+}
+
 /// An iterator that returns k-length permutations of values from `iter`.
 ///
 /// This `struct` is created by the [`permutations`] method on [`IterExt`]. See its
@@ -59,9 +100,9 @@ pub struct Permutations<I, const K: usize>
 where
     I: Iterator,
 {
-    iter: Combinations<I, K>,
-    items: Option<[I::Item; K]>,
-    perm_gen: LazyPermutationGenerator<K>,
+    iter: I,
+    items: Vec<I::Item>,
+    state: State<K>,
 }
 
 impl<I, const K: usize> Iterator for Permutations<I, K>
@@ -71,24 +112,16 @@ where
 {
     type Item = [I::Item; K];
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.items.is_none() {
-            // Load a new combination
-            self.items = self.iter.next();
-        }
-        if let Some(items) = self.items.as_ref() {
-            let indices = self.perm_gen.indices();
-            let res = make_array(|i| items[indices[i]].clone());
-            self.perm_gen.step();
-            if self.perm_gen.is_done() {
-                // Refresh the permutation generator
-                self.perm_gen = LazyPermutationGenerator::new();
-                self.items = None;
+    fn next(&mut self) -> Option<[I::Item; K]> {
+        if K > 0 {
+            let max_index = self.state.max_index().unwrap();
+            let missing_count = (max_index + 1).saturating_sub(self.items.len());
+            if missing_count > 0 {
+                // Try to fill the buffer
+                self.items.extend(self.iter.by_ref().take(missing_count));
             }
-            Some(res)
-        } else {
-            None
         }
+        self.state.get_and_step(&self.items, |t| t.clone())
     }
 }
 
@@ -98,9 +131,9 @@ where
 {
     pub(crate) fn new(iter: I) -> Self {
         Self {
-            iter: Combinations::new(iter),
-            items: None,
-            perm_gen: LazyPermutationGenerator::new(),
+            iter,
+            items: Vec::new(),
+            state: State::new(),
         }
     }
 }
@@ -120,29 +153,14 @@ where
 #[must_use = "iterators do nothing unless consumed"]
 pub struct SlicePermutations<'a, T, const K: usize> {
     items: &'a [T],
-    comb_gen: LazyCombinationGenerator<K>,
-    perm_gen: LazyPermutationGenerator<K>,
+    state: State<K>,
 }
 
 impl<'a, T, const K: usize> Iterator for SlicePermutations<'a, T, K> {
     type Item = [&'a T; K];
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.comb_gen.is_done(self.items.len()) {
-            None
-        } else {
-            let items = self.items;
-            let comb_indices = self.comb_gen.indices();
-            let perm_indices = self.perm_gen.indices();
-            let res = make_array(|i| &items[comb_indices[perm_indices[i]]]);
-            self.perm_gen.step();
-            if self.perm_gen.is_done() {
-                // Reset the permutation generator and move to the next combination
-                self.perm_gen = LazyPermutationGenerator::new();
-                self.comb_gen.step();
-            }
-            Some(res)
-        }
+        self.state.get_and_step(self.items, |t| t)
     }
 }
 
@@ -150,8 +168,7 @@ impl<'a, T, const K: usize> SlicePermutations<'a, T, K> {
     pub(crate) fn new(items: &'a [T]) -> Self {
         Self {
             items,
-            comb_gen: LazyCombinationGenerator::new(),
-            perm_gen: LazyPermutationGenerator::new(),
+            state: State::new(),
         }
     }
 }

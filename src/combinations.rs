@@ -44,6 +44,38 @@ impl<const K: usize> LazyCombinationGenerator<K> {
     }
 }
 
+#[derive(Clone)]
+struct State<const K: usize> {
+    gen: LazyCombinationGenerator<K>,
+}
+
+impl<const K: usize> State<K> {
+    fn new() -> Self {
+        Self {
+            gen: LazyCombinationGenerator::new(),
+        }
+    }
+
+    fn max_index(&self) -> Option<usize> {
+        self.gen.max_index()
+    }
+
+    fn get_and_step<'a, T, O, F>(&mut self, items: &'a [T], f: F) -> Option<[O; K]>
+    where
+        F: Fn(&'a T) -> O,
+        O: 'a,
+    {
+        if self.gen.is_done(items.len()) {
+            None
+        } else {
+            let indices = self.gen.indices();
+            let res = make_array(|i| f(&items[indices[i]]));
+            self.gen.step();
+            Some(res)
+        }
+    }
+}
+
 /// An iterator that returns k-length combinations of values from `iter`.
 ///
 /// This `struct` is created by the [`combinations`] method on [`IterExt`]. See its
@@ -59,7 +91,7 @@ where
 {
     iter: I,
     items: Vec<I::Item>,
-    gen: LazyCombinationGenerator<K>,
+    state: State<K>,
 }
 
 impl<I, const K: usize> Combinations<I, K>
@@ -68,9 +100,9 @@ where
 {
     pub(crate) fn new(iter: I) -> Self {
         Self {
-            items: Vec::new(),
             iter,
-            gen: LazyCombinationGenerator::new(),
+            items: Vec::new(),
+            state: State::new(),
         }
     }
 }
@@ -83,25 +115,15 @@ where
     type Item = [I::Item; K];
 
     fn next(&mut self) -> Option<[I::Item; K]> {
-        // Check if we need to consume more from the iterator
-        let missing_count = self
-            .gen
-            .max_index()
-            .map(|m| (m + 1).saturating_sub(self.items.len()))
-            .unwrap_or_default();
-        if missing_count > 0 {
-            // Try to fill the buffer
-            self.items.extend(self.iter.by_ref().take(missing_count));
+        if K > 0 {
+            let max_index = self.state.max_index().unwrap();
+            let missing_count = (max_index + 1).saturating_sub(self.items.len());
+            if missing_count > 0 {
+                // Try to fill the buffer
+                self.items.extend(self.iter.by_ref().take(missing_count));
+            }
         }
-
-        if self.gen.is_done(self.items.len()) {
-            None
-        } else {
-            let indices = self.gen.indices();
-            let res = make_array(|i| self.items[indices[i]].clone());
-            self.gen.step();
-            Some(res)
-        }
+        self.state.get_and_step(&self.items, |t| t.clone())
     }
 }
 
@@ -116,14 +138,14 @@ where
 #[must_use = "iterator does nothing unless consumed"]
 pub struct SliceCombinations<'a, T, const K: usize> {
     items: &'a [T],
-    gen: LazyCombinationGenerator<K>,
+    state: State<K>,
 }
 
 impl<'a, T, const K: usize> SliceCombinations<'a, T, K> {
     pub(crate) fn new(items: &'a [T]) -> Self {
         Self {
             items,
-            gen: LazyCombinationGenerator::new(),
+            state: State::new(),
         }
     }
 }
@@ -132,14 +154,7 @@ impl<'a, T, const K: usize> Iterator for SliceCombinations<'a, T, K> {
     type Item = [&'a T; K];
 
     fn next(&mut self) -> Option<[&'a T; K]> {
-        if self.gen.is_done(self.items.len()) {
-            None
-        } else {
-            let indices = self.gen.indices();
-            let res = make_array(|i| &self.items[indices[i]]);
-            self.gen.step();
-            Some(res)
-        }
+        self.state.get_and_step(self.items, |t| t)
     }
 }
 
