@@ -1,56 +1,89 @@
-use super::Combinations;
+use crate::{combinations::LazyCombinationGenerator, make_array};
+use alloc::vec::Vec;
 use core::iter::{FusedIterator, Iterator};
 
 #[derive(Clone)]
-struct FullPermutations<T, const N: usize> {
-    items: [T; N],
+pub struct LazyPermutationGenerator<const N: usize> {
     indices: [usize; N],
-    first: bool,
+    counters: [usize; N],
     done: bool,
 }
 
-impl<T, const N: usize> FullPermutations<T, N> {
-    fn new(items: [T; N]) -> Self {
+impl<const N: usize> LazyPermutationGenerator<N> {
+    pub fn new() -> Self {
         Self {
-            items,
-            indices: [0; N],
-            first: true,
+            indices: make_array(|i| i),
+            counters: [0; N],
             done: false,
+        }
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.done
+    }
+
+    pub fn indices(&self) -> &[usize; N] {
+        &self.indices
+    }
+
+    pub fn step(&mut self) {
+        // Iterative version of Heap's algorithm
+        // https://en.wikipedia.org/wiki/Heap%27s_algorithm
+        let mut i = 1;
+        while i < N && self.counters[i] >= i {
+            self.counters[i] = 0;
+            i += 1;
+        }
+        if i < N {
+            if i & 1 == 0 {
+                self.indices.swap(i, 0);
+            } else {
+                self.indices.swap(i, self.counters[i]);
+            };
+            self.counters[i] += 1;
+        } else {
+            self.done = true;
         }
     }
 }
 
-impl<T, const N: usize> Iterator for FullPermutations<T, N>
-where
-    T: Clone,
-{
-    type Item = [T; N];
+#[derive(Clone)]
+struct State<const K: usize> {
+    comb_gen: LazyCombinationGenerator<K>,
+    perm_gen: LazyPermutationGenerator<K>,
+}
 
-    fn next(&mut self) -> Option<Self::Item> {
-        // Iterative version of Heap's algorithm
-        // https://en.wikipedia.org/wiki/Heap%27s_algorithm
-        if self.first {
-            self.first = false;
-        } else if self.done {
-            return None;
-        } else {
-            let mut i = 1;
-            while i < N && self.indices[i] >= i {
-                self.indices[i] = 0;
-                i += 1;
-            }
-            if i >= N {
-                self.done = true;
-                return None;
-            }
-            if i & 1 == 0 {
-                self.items.swap(i, 0);
-            } else {
-                self.items.swap(i, self.indices[i]);
-            };
-            self.indices[i] += 1;
+impl<const K: usize> State<K> {
+    fn new() -> Self {
+        Self {
+            comb_gen: LazyCombinationGenerator::new(),
+            perm_gen: LazyPermutationGenerator::new(),
         }
-        Some(self.items.clone())
+    }
+
+    fn max_index(&self) -> Option<usize> {
+        self.comb_gen.max_index()
+    }
+
+    fn get_and_step<'a, T, O, F>(&mut self, items: &'a [T], f: F) -> Option<[O; K]>
+    where
+        F: Fn(&'a T) -> O,
+        O: 'a,
+    {
+        if self.comb_gen.is_done(items.len()) {
+            None
+        } else {
+            let comb_indices = self.comb_gen.indices();
+            let perm_indices = self.perm_gen.indices();
+            let res = make_array(|i| f(&items[comb_indices[perm_indices[i]]]));
+            self.perm_gen.step();
+            if self.perm_gen.is_done() {
+                // Reset the permutation generator and move to the next combination
+                self.perm_gen = LazyPermutationGenerator::new();
+                self.comb_gen.step();
+            }
+            Some(res)
+        }
     }
 }
 
@@ -67,8 +100,22 @@ pub struct Permutations<I, const K: usize>
 where
     I: Iterator,
 {
-    iter: Combinations<I, K>,
-    perm_iter: Option<FullPermutations<I::Item, K>>,
+    iter: I,
+    items: Vec<I::Item>,
+    state: State<K>,
+}
+
+impl<I, const K: usize> Permutations<I, K>
+where
+    I: Iterator,
+{
+    pub(crate) fn new(iter: I) -> Self {
+        Self {
+            iter,
+            items: Vec::new(),
+            state: State::new(),
+        }
+    }
 }
 
 impl<I, const K: usize> Iterator for Permutations<I, K>
@@ -78,29 +125,16 @@ where
 {
     type Item = [I::Item; K];
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(perm_iter) = &mut self.perm_iter {
-            if let Some(a) = perm_iter.next() {
-                return Some(a);
+    fn next(&mut self) -> Option<[I::Item; K]> {
+        if K > 0 {
+            let max_index = self.state.max_index().unwrap();
+            let missing_count = (max_index + 1).saturating_sub(self.items.len());
+            if missing_count > 0 {
+                // Try to fill the buffer
+                self.items.extend(self.iter.by_ref().take(missing_count));
             }
         }
-        self.perm_iter = self.iter.next().map(FullPermutations::new);
-        // Each `FullPermutations` is guaranteed to return at least one item.
-        // `None` will be returned only if `perm_iter` is `None`,
-        // which means that the inner iterator returned `None`.
-        self.perm_iter.as_mut().and_then(|i| i.next())
-    }
-}
-
-impl<I, const K: usize> Permutations<I, K>
-where
-    I: Iterator,
-{
-    pub(crate) fn new(iter: I) -> Self {
-        Self {
-            iter: Combinations::new(iter),
-            perm_iter: None,
-        }
+        self.state.get_and_step(&self.items, |t| t.clone())
     }
 }
 
@@ -114,6 +148,32 @@ where
     I::Item: Clone,
 {
 }
+
+#[derive(Clone)]
+#[must_use = "iterators do nothing unless consumed"]
+pub struct SlicePermutations<'a, T, const K: usize> {
+    items: &'a [T],
+    state: State<K>,
+}
+
+impl<'a, T, const K: usize> Iterator for SlicePermutations<'a, T, K> {
+    type Item = [&'a T; K];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.state.get_and_step(self.items, |t| t)
+    }
+}
+
+impl<'a, T, const K: usize> SlicePermutations<'a, T, K> {
+    pub(crate) fn new(items: &'a [T]) -> Self {
+        Self {
+            items,
+            state: State::new(),
+        }
+    }
+}
+
+impl<T, const K: usize> FusedIterator for SlicePermutations<'_, T, K> {}
 
 #[cfg(test)]
 mod test {
@@ -135,16 +195,29 @@ mod test {
     }
 
     #[test]
-    fn full_order() {
-        let mut permutations = FullPermutations::new([1, 2, 3]);
-        assert_eq!(permutations.next(), Some([1, 2, 3]));
-        assert_eq!(permutations.next(), Some([2, 1, 3]));
-        assert_eq!(permutations.next(), Some([3, 1, 2]));
-        assert_eq!(permutations.next(), Some([1, 3, 2]));
-        assert_eq!(permutations.next(), Some([2, 3, 1]));
-        assert_eq!(permutations.next(), Some([3, 2, 1]));
-        assert_eq!(permutations.next(), None);
-        assert_eq!(permutations.next(), None);
+    fn gen_order() {
+        let mut gen = LazyPermutationGenerator::new();
+        assert_eq!(gen.indices(), &[0, 1, 2]);
+        assert!(!gen.is_done());
+        gen.step();
+        assert_eq!(gen.indices(), &[1, 0, 2]);
+        assert!(!gen.is_done());
+        gen.step();
+        assert_eq!(gen.indices(), &[2, 0, 1]);
+        assert!(!gen.is_done());
+        gen.step();
+        assert_eq!(gen.indices(), &[0, 2, 1]);
+        assert!(!gen.is_done());
+        gen.step();
+        assert_eq!(gen.indices(), &[1, 2, 0]);
+        assert!(!gen.is_done());
+        gen.step();
+        assert_eq!(gen.indices(), &[2, 1, 0]);
+        assert!(!gen.is_done());
+        gen.step();
+        assert!(gen.is_done());
+        gen.step();
+        assert!(gen.is_done());
     }
 
     #[test]
@@ -220,6 +293,39 @@ mod test {
         assert_eq!(permutations.next(), Some([3, 1]));
         assert_eq!(permutations.next(), Some([2, 3]));
         assert_eq!(permutations.next(), Some([3, 2]));
+        assert_eq!(permutations.next(), None);
+        assert_eq!(permutations.next(), None);
+    }
+}
+
+#[cfg(test)]
+mod slice_test {
+    use crate::SliceExt;
+
+    #[test]
+    fn order() {
+        let mut permutations = [1, 2, 3].permutations();
+        assert_eq!(permutations.next(), Some([&1, &2]));
+        assert_eq!(permutations.next(), Some([&2, &1]));
+        assert_eq!(permutations.next(), Some([&1, &3]));
+        assert_eq!(permutations.next(), Some([&3, &1]));
+        assert_eq!(permutations.next(), Some([&2, &3]));
+        assert_eq!(permutations.next(), Some([&3, &2]));
+        assert_eq!(permutations.next(), None);
+        assert_eq!(permutations.next(), None);
+    }
+
+    #[test]
+    fn none_on_size_too_big() {
+        let mut permutations = [1].permutations::<2>();
+        assert_eq!(permutations.next(), None);
+        assert_eq!(permutations.next(), None);
+    }
+
+    #[test]
+    fn empty_arr_on_n_zero() {
+        let mut permutations = [1, 2, 3, 4].permutations();
+        assert_eq!(permutations.next(), Some([]));
         assert_eq!(permutations.next(), None);
         assert_eq!(permutations.next(), None);
     }

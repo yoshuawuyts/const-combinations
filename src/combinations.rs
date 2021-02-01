@@ -1,6 +1,80 @@
+use crate::make_array;
 use alloc::vec::Vec;
 use core::iter::{FusedIterator, Iterator};
-use core::mem::MaybeUninit;
+
+#[derive(Clone)]
+pub struct LazyCombinationGenerator<const K: usize> {
+    indices: [usize; K],
+    done: bool,
+}
+
+impl<const K: usize> LazyCombinationGenerator<K> {
+    pub fn new() -> Self {
+        Self {
+            indices: make_array(|i| i),
+            done: false,
+        }
+    }
+
+    pub fn max_index(&self) -> Option<usize> {
+        self.indices.last().copied()
+    }
+
+    pub fn is_done(&self, item_count: usize) -> bool {
+        self.done || self.max_index() >= Some(item_count)
+    }
+
+    pub fn indices(&self) -> &[usize; K] {
+        &self.indices
+    }
+
+    pub fn step(&mut self) {
+        if K == 0 {
+            self.done = true;
+        } else {
+            let mut i = 0;
+            // Reset consecutive indices
+            while i + 1 < K && self.indices[i] + 1 == self.indices[i + 1] {
+                self.indices[i] = i;
+                i += 1;
+            }
+            // Increment the last consecutive index
+            self.indices[i] += 1;
+        }
+    }
+}
+
+#[derive(Clone)]
+struct State<const K: usize> {
+    gen: LazyCombinationGenerator<K>,
+}
+
+impl<const K: usize> State<K> {
+    fn new() -> Self {
+        Self {
+            gen: LazyCombinationGenerator::new(),
+        }
+    }
+
+    fn max_index(&self) -> Option<usize> {
+        self.gen.max_index()
+    }
+
+    fn get_and_step<'a, T, O, F>(&mut self, items: &'a [T], f: F) -> Option<[O; K]>
+    where
+        F: Fn(&'a T) -> O,
+        O: 'a,
+    {
+        if self.gen.is_done(items.len()) {
+            None
+        } else {
+            let indices = self.gen.indices();
+            let res = make_array(|i| f(&items[indices[i]]));
+            self.gen.step();
+            Some(res)
+        }
+    }
+}
 
 /// An iterator that returns k-length combinations of values from `iter`.
 ///
@@ -16,9 +90,8 @@ where
     I: Iterator,
 {
     iter: I,
-    buffer: Vec<I::Item>,
-    indices: [usize; K],
-    first: bool,
+    items: Vec<I::Item>,
+    state: State<K>,
 }
 
 impl<I, const K: usize> Combinations<I, K>
@@ -26,19 +99,10 @@ where
     I: Iterator,
 {
     pub(crate) fn new(iter: I) -> Self {
-        // Prepare the indices.
-        let mut indices = [0; K];
-        // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
-        #[allow(clippy::clippy::needless_range_loop)]
-        for i in 0..K {
-            indices[i] = i;
-        }
-
         Self {
-            buffer: Vec::new(),
-            indices,
-            first: true,
             iter,
+            items: Vec::new(),
+            state: State::new(),
         }
     }
 }
@@ -51,46 +115,15 @@ where
     type Item = [I::Item; K];
 
     fn next(&mut self) -> Option<[I::Item; K]> {
-        if self.first {
-            // Fill the buffer for the first combination
-            self.buffer.reserve(K - self.buffer.len());
-            while self.buffer.len() < K {
-                match self.iter.next() {
-                    Some(x) => self.buffer.push(x),
-                    None => return None,
-                }
+        if K > 0 {
+            let max_index = self.state.max_index().unwrap();
+            let missing_count = (max_index + 1).saturating_sub(self.items.len());
+            if missing_count > 0 {
+                // Try to fill the buffer
+                self.items.extend(self.iter.by_ref().take(missing_count));
             }
-            self.first = false;
-        } else if K == 0 {
-            // This check is separated, because in case of K == 0 we still
-            // need to return a single empty array before returning None.
-            return None;
-        } else {
-            // Check if we need to consume more from the iterator
-            if self.indices[0] == self.buffer.len() - K {
-                // Exhausted all combinations in the current buffer
-                match self.iter.next() {
-                    Some(x) => self.buffer.push(x),
-                    None => return None,
-                }
-            }
-
-            let mut i = 0;
-            // Reset consecutive indices
-            while i < K - 1 && self.indices[i] + 1 == self.indices[i + 1] {
-                self.indices[i] = i;
-                i += 1;
-            }
-            // Increment the last consecutive index
-            self.indices[i] += 1;
         }
-
-        // Create the result array based on the indices
-        let mut out: [MaybeUninit<I::Item>; K] = MaybeUninit::uninit_array();
-        self.indices.iter().enumerate().for_each(|(oi, i)| {
-            out[oi] = MaybeUninit::new(self.buffer[*i].clone());
-        });
-        Some(unsafe { out.as_ptr().cast::<[I::Item; K]>().read() })
+        self.state.get_and_step(&self.items, |t| t.clone())
     }
 }
 
@@ -100,6 +133,32 @@ where
     I::Item: Clone,
 {
 }
+
+#[derive(Clone)]
+#[must_use = "iterator does nothing unless consumed"]
+pub struct SliceCombinations<'a, T, const K: usize> {
+    items: &'a [T],
+    state: State<K>,
+}
+
+impl<'a, T, const K: usize> SliceCombinations<'a, T, K> {
+    pub(crate) fn new(items: &'a [T]) -> Self {
+        Self {
+            items,
+            state: State::new(),
+        }
+    }
+}
+
+impl<'a, T, const K: usize> Iterator for SliceCombinations<'a, T, K> {
+    type Item = [&'a T; K];
+
+    fn next(&mut self) -> Option<[&'a T; K]> {
+        self.state.get_and_step(self.items, |t| t)
+    }
+}
+
+impl<T, const K: usize> FusedIterator for SliceCombinations<'_, T, K> {}
 
 #[cfg(test)]
 mod test {
@@ -198,6 +257,43 @@ mod test {
         assert_eq!(combinations.next(), Some([1, 2, 4]));
         assert_eq!(combinations.next(), Some([1, 3, 4]));
         assert_eq!(combinations.next(), Some([2, 3, 4]));
+        assert_eq!(combinations.next(), None);
+        assert_eq!(combinations.next(), None);
+    }
+}
+
+#[cfg(test)]
+mod slice_test {
+    use crate::SliceExt;
+
+    #[test]
+    fn order() {
+        let mut combinations = [1, 2, 3, 4, 5].combinations();
+        assert_eq!(combinations.next(), Some([&1, &2, &3]));
+        assert_eq!(combinations.next(), Some([&1, &2, &4]));
+        assert_eq!(combinations.next(), Some([&1, &3, &4]));
+        assert_eq!(combinations.next(), Some([&2, &3, &4]));
+        assert_eq!(combinations.next(), Some([&1, &2, &5]));
+        assert_eq!(combinations.next(), Some([&1, &3, &5]));
+        assert_eq!(combinations.next(), Some([&2, &3, &5]));
+        assert_eq!(combinations.next(), Some([&1, &4, &5]));
+        assert_eq!(combinations.next(), Some([&2, &4, &5]));
+        assert_eq!(combinations.next(), Some([&3, &4, &5]));
+        assert_eq!(combinations.next(), None);
+        assert_eq!(combinations.next(), None);
+    }
+
+    #[test]
+    fn none_on_size_too_big() {
+        let mut combinations = [1].combinations::<2>();
+        assert_eq!(combinations.next(), None);
+        assert_eq!(combinations.next(), None);
+    }
+
+    #[test]
+    fn empty_arr_on_n_zero() {
+        let mut combinations = [1, 2, 3, 4].combinations();
+        assert_eq!(combinations.next(), Some([]));
         assert_eq!(combinations.next(), None);
         assert_eq!(combinations.next(), None);
     }
