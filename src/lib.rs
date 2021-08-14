@@ -92,6 +92,7 @@ pub trait IterExt: Iterator {
 
 impl<I> IterExt for I where I: Iterator {}
 
+/// An extension trait adding `combinations` and `permutations` to `Slice`.
 pub trait SliceExt<T> {
     /// Return an iterator that iterates over the k-length combinations of
     /// the elements from a slice.
