@@ -1,6 +1,6 @@
 [package]
 name = "const-combinations"
-version = "1.0.0"
+version = "2.0.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/yoshuawuyts/const-combinations"
 documentation = "https://docs.rs/const-combinations"
