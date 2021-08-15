@@ -149,6 +149,7 @@ where
 {
 }
 
+/// An iterator that returns k-length permutations of values from `slice`.
 #[derive(Clone)]
 #[must_use = "iterators do nothing unless consumed"]
 pub struct SlicePermutations<'a, T, const K: usize> {

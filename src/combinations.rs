@@ -134,6 +134,7 @@ where
 {
 }
 
+/// An iterator that returns k-length combinations of values from `slice`.
 #[derive(Clone)]
 #[must_use = "iterator does nothing unless consumed"]
 pub struct SliceCombinations<'a, T, const K: usize> {
