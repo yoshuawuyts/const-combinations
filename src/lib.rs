@@ -14,7 +14,6 @@
 //! ```
 
 #![no_std]
-#![feature(maybe_uninit_uninit_array)]
 
 extern crate alloc;
 
@@ -137,7 +136,7 @@ pub trait SliceExt<T> {
     /// assert_eq!(combinations.next(), Some([&2, &2]));
     /// assert_eq!(combinations.next(), None);
     /// ```
-    fn combinations<const K: usize>(&self) -> SliceCombinations<T, K>;
+    fn combinations<const K: usize>(&self) -> SliceCombinations<'_, T, K>;
 
     /// Return an iterator that iterates over the k-length permutations of
     /// the elements from a slice.
@@ -169,31 +168,14 @@ pub trait SliceExt<T> {
     /// assert_eq!(permutations.next(), Some([&2, &2])); // Note: these are the same
     /// assert_eq!(permutations.next(), None);
     /// ```
-    fn permutations<const K: usize>(&self) -> SlicePermutations<T, K>;
+    fn permutations<const K: usize>(&self) -> SlicePermutations<'_, T, K>;
 }
 
 impl<T> SliceExt<T> for [T] {
-    fn combinations<const K: usize>(&self) -> SliceCombinations<T, K> {
+    fn combinations<const K: usize>(&self) -> SliceCombinations<'_, T, K> {
         SliceCombinations::new(self)
     }
-    fn permutations<const K: usize>(&self) -> SlicePermutations<T, K> {
+    fn permutations<const K: usize>(&self) -> SlicePermutations<'_, T, K> {
         SlicePermutations::new(self)
     }
-}
-
-fn make_array<T, F, const N: usize>(f: F) -> [T; N]
-where
-    F: Fn(usize) -> T,
-{
-    use core::mem::MaybeUninit;
-
-    // Create the result array based on the indices
-    let mut out: [MaybeUninit<T>; N] = MaybeUninit::uninit_array();
-
-    // NOTE: this clippy attribute can be removed once we can `collect` into `[usize; K]`.
-    #[allow(clippy::clippy::needless_range_loop)]
-    for i in 0..N {
-        out[i] = MaybeUninit::new(f(i));
-    }
-    unsafe { out.as_ptr().cast::<[T; N]>().read() }
 }

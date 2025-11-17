@@ -1,4 +1,3 @@
-use crate::make_array;
 use alloc::vec::Vec;
 use core::iter::{FusedIterator, Iterator};
 
@@ -11,7 +10,7 @@ pub struct LazyCombinationGenerator<const K: usize> {
 impl<const K: usize> LazyCombinationGenerator<K> {
     pub fn new() -> Self {
         Self {
-            indices: make_array(|i| i),
+            indices: core::array::from_fn(|i| i),
             done: false,
         }
     }
@@ -69,7 +68,7 @@ impl<const K: usize> State<K> {
             None
         } else {
             let indices = self.gen.indices();
-            let res = make_array(|i| f(&items[indices[i]]));
+            let res = core::array::from_fn(|i| f(&items[indices[i]]));
             self.gen.step();
             Some(res)
         }
