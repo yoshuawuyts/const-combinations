@@ -1,4 +1,4 @@
-use crate::{combinations::LazyCombinationGenerator, make_array};
+use crate::combinations::LazyCombinationGenerator;
 use alloc::vec::Vec;
 use core::iter::{FusedIterator, Iterator};
 
@@ -12,7 +12,7 @@ pub struct LazyPermutationGenerator<const N: usize> {
 impl<const N: usize> LazyPermutationGenerator<N> {
     pub fn new() -> Self {
         Self {
-            indices: make_array(|i| i),
+            indices: core::array::from_fn(|i| i),
             counters: [0; N],
             done: false,
         }
@@ -75,7 +75,7 @@ impl<const K: usize> State<K> {
         } else {
             let comb_indices = self.comb_gen.indices();
             let perm_indices = self.perm_gen.indices();
-            let res = make_array(|i| f(&items[comb_indices[perm_indices[i]]]));
+            let res = core::array::from_fn(|i| f(&items[comb_indices[perm_indices[i]]]));
             self.perm_gen.step();
             if self.perm_gen.is_done() {
                 // Reset the permutation generator and move to the next combination
